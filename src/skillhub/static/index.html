@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkillHub — Agent Skill 管理工具</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/security.css">
+<link rel="stylesheet" href="/static/security.css">
+</head>
+<body>
+
+<!-- App Header -->
+<header class="app-header">
+  <button class="icon-btn mobile-nav-btn" id="mobileNavBtn" onclick="toggleSidebar()" data-i18n-title="openNavigation" title="打开导航">☰</button>
+  <div class="logo" aria-hidden="true">⚡</div>
+  <div class="title-wrap">
+    <h1>SkillHub</h1>
+    <span class="subtitle" data-i18n="subtitle">通用 Agent Skill 管理工具</span>
+  </div>
+  <div class="header-stats" aria-label="Workspace summary">
+    <span class="stat"><b id="statTotal">–</b> skills</span>
+    <span class="stat stat-secondary"><b id="statAgents">–</b> agents</span>
+    <span class="stat stat-secondary"><b id="statSources">–</b> sources</span>
+    <span class="stat stat-secondary disabled"><b id="statDisabled">–</b> <span data-i18n="statDisabled">已禁用</span></span>
+    <span class="stat stat-secondary security-stat" id="securityStat" title="agent-skill-scanner">
+      <span aria-hidden="true">🛡</span><b id="statAudited">–</b> <span data-i18n="statAudited">已审计</span>
+    </span>
+    <span class="stat stat-secondary security-stat" id="securityStat" title="agent-skill-scanner">
+      <span aria-hidden="true">🛡</span><b id="statAudited">–</b> <span data-i18n="statAudited">已审计</span>
+    </span>
+    <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Theme" data-i18n-title="themeTip">🌙</button>
+    <select id="langSwitcher" class="lang-switcher" title="Language">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+</header>
+
+<!-- Platform Architecture -->
+<section class="platform-shell" aria-labelledby="platformHeading">
+  <div class="platform-heading">
+    <span class="eyebrow" data-i18n="platformLabel">平台架构</span>
+    <strong id="platformHeading" data-i18n="platformHint">按 Agent 组织来源与权限</strong>
+  </div>
+  <div class="agent-overview" id="agentOverview"></div>
+</section>
+
+<!-- Command Bar -->
+<div class="toolbar-shell">
+  <div class="toolbar">
+    <label class="search-wrap" for="searchInput">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" data-i18n-ph="searchPlaceholder" placeholder="搜索 skill 名称/描述/标签...">
+      <kbd>Ctrl K</kbd>
+    </label>
+    <div class="toolbar-filters">
+      <select id="sourceFilter" aria-label="Source">
+        <option value="">所有 Source</option>
+      </select>
+      <select id="categoryFilter" aria-label="Category">
+        <option value="">所有分类</option>
+      </select>
+      <select id="disabledFilter" aria-label="Status">
+        <option value="">全部状态</option>
+        <option value="false">✅ 仅启用</option>
+        <option value="true">⛔ 仅禁用</option>
+      </select>
+      <select id="sortSel" aria-label="Sort">
+        <option value="">默认排序</option>
+        <option value="name">🔤 名称 A→Z</option>
+        <option value="-name">🔤 名称 Z→A</option>
+        <option value="-modified">🕐 最近修改</option>
+        <option value="-size">📦 体积最大</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <div class="toolbar-actions">
+      <span id="resultCount"></span>
+      <button id="rescanBtn" onclick="rescanAll()" title="重新扫描所有 skill 目录（外部改动后用）" data-i18n-title="rescanTip">↻</button>
+      <div class="view-switcher" id="viewSwitcher">
+        <button id="viewGridBtn" class="active" onclick="setView('grid')" title="Grid view" data-i18n-title="gridViewTip">▦</button>
+        <button id="viewListBtn" onclick="setView('list')" title="List view" data-i18n-title="listViewTip">☷</button>
+      </div>
+      <span id="selectionInfo"></span>
+      <button id="batchDisableBtn" class="danger-hover" onclick="batchSetDisabled('disable')" style="display:none;" data-i18n="batchDisable">⛔ 禁用所选</button>
+      <button id="batchEnableBtn" class="good-hover" onclick="batchSetDisabled('enable')" style="display:none;" data-i18n="batchEnable">▶ 启用所选</button>
+      <button class="secondary-action" onclick="showCompare()" data-i18n="compareBtn">📊 跨 Source 对比</button>
+      <button class="primary" onclick="showCreateDialog()" data-i18n="createBtn">＋ 新建 Skill</button>
+    </div>
+  </div>
+  <div class="active-filter-bar" id="activeFilterBar"></div>
+</div>
+
+<!-- Workspace -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
+<main class="main">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <div>
+        <span class="eyebrow" data-i18n="workspaceLabel">工作区</span>
+        <strong data-i18n="navigation">导航与筛选</strong>
+      </div>
+      <button class="close-btn mobile-only" onclick="toggleSidebar(false)" aria-label="Close">✕</button>
+    </div>
+    <button class="all-skills-item" id="allSkillsItem" onclick="resetFilters()">
+      <span>◈</span><span data-i18n="allSkills">全部 Skills</span><span class="count" id="allSkillsCount">–</span>
+    </button>
+    <h3 data-i18n="agentsAndSources">Agents & Sources</h3>
+    <div id="sourceList"></div>
+    <h3 data-i18n="categories">分类</h3>
+    <div id="categoryList"></div>
+  </aside>
+
+  <section class="content" aria-labelledby="libraryTitle">
+    <div class="content-heading">
+      <div>
+        <span class="eyebrow" data-i18n="libraryEyebrow">Skill Registry</span>
+        <h2 id="libraryTitle" data-i18n="skillsLibrary">技能库</h2>
+        <p id="libraryContext" data-i18n="libraryContext">跨 Agent 浏览、对比与管理技能资产</p>
+      </div>
+      <button class="filter-mobile mobile-only" onclick="toggleSidebar(true)" data-i18n="filterButton">筛选</button>
+    </div>
+    <div class="skill-grid" id="skillGrid"></div>
+  </section>
+</main>
+
+<!-- Detail Panel -->
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-header">
+    <h2 id="detailTitle">Skill 详情</h2>
+    <button class="close-btn" onclick="closeDetail()">✕</button>
+  </div>
+  <div class="detail-tabs">
+    <button class="active" data-tab="info" data-i18n="tabInfo">📋 信息</button>
+    <button data-tab="preview" data-i18n="tabPreview">👁️ 预览</button>
+    <button data-tab="security" data-i18n="tabSecurity">🛡️ 安全</button>
+    <button data-tab="security" data-i18n="tabSecurity">🛡️ 安全</button>
+    <button data-tab="edit" data-i18n="tabEdit">✏️ 编辑</button>
+    <button data-tab="files" data-i18n="tabFiles">📁 文件</button>
+    <button data-tab="compare" data-i18n="tabCompare">📊 对比</button>
+  </div>
+  <div class="detail-body" id="detailBody"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
